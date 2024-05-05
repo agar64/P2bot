@@ -51,7 +51,7 @@ motives = ["that happens in the game", "bro liked his own comment", "I gotta hop
            "pensei em padrinhos magicos tbm", "I have no idea", "Urobuchi you cooked again",
            "all you have to do is not let him near women", "I am smart", "(Tava afim de comer lamen)",
            "when the spire is slain\nBottom text"]
-
+#test
 def select_text():
     action, first_name, middle_name, last_name = "", "", "", ""
     if(random.randint(0, 1)):
