@@ -15,6 +15,11 @@ def save_data(array):
 def load_data():
     return np.load("chat_settings.npy")
 
+def load_suggestions():
+    saved_suggestions = np.load("suggestions.npz")
+    return saved_suggestions
+
+
 msg_counter = 0
 reply_after = 50
 random_variation = 0
@@ -61,18 +66,40 @@ motives = ["that happens in the game", "bro liked his own comment", "I gotta hop
            "pensei em padrinhos magicos tbm", "I have no idea", "Urobuchi you cooked again",
            "all you have to do is not let him near women", "I am smart", "(Tava afim de comer lamen)",
            "when the spire is slain\nBottom text"]
-#test
+try:
+    game_names_suggested = load_suggestions()["a"]
+    movie_names_suggested = load_suggestions()["b"]
+    opinions_suggested = load_suggestions()["c"]
+    motives_suggested = load_suggestions()["d"]
+    print("Suggestions loaded successfully")
+except:
+    game_names_suggested = []
+    movie_names_suggested = []
+    opinions_suggested = []
+    motives_suggested = []
+    print("Suggestions file not found")
+
+def save_suggestions():
+    #saved_suggestions = [game_names_suggested, movie_names_suggested, opinions_suggested, motives_suggested]
+    np.savez("suggestions", a=game_names_suggested, b=movie_names_suggested, c=opinions_suggested, d=motives_suggested)
+
+
 def select_text():
     action, first_name, middle_name, last_name = "", "", "", ""
+    game_names_all = game_names + game_names_suggested
+    movie_names_all = movie_names + movie_names_suggested
+    opinions_all = opinions + opinions_suggested
+    motives_all = motives + motives_suggested
+
     if(random.randint(0, 1)):
-        first_name = game_names[random.randint(0, len(game_names)-1)]
+        first_name = game_names_all[random.randint(0, len(game_names_all)-1)]
         action = "jogar"
     else:
-        first_name = movie_names[random.randint(0, len(movie_names) - 1)]
+        first_name = movie_names_all[random.randint(0, len(movie_names_all) - 1)]
         action = "assistir"
 
-    middle_name = opinions[random.randint(0, len(opinions)-1)]
-    last_name = motives[random.randint(0, len(motives)-1)]
+    middle_name = opinions_all[random.randint(0, len(opinions_all)-1)]
+    last_name = motives_all[random.randint(0, len(motives_all)-1)]
 
     return "Acabei de " + action + " " + first_name + " e " + middle_name + " pois " + last_name
 
@@ -103,77 +130,112 @@ def send_welcome(message):
 @bot.message_handler(commands=['restart'])
 def restart_handler(message):
     global chatID_matrix
-    ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
-    chatID_matrix = np.delete(chatID_matrix, (ID_index), axis=0)
-    bot.reply_to(message, "Howdy, how are you doing? All your settings were reset")
-    start_conversation(message.chat.id)
+    if (check_for_start(message)):
+        ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
+        chatID_matrix = np.delete(chatID_matrix, (ID_index), axis=0)
+        bot.reply_to(message, "Howdy, how are you doing? All your settings were reset")
+        start_conversation(message.chat.id)
 
 
 @bot.message_handler(commands=['speak'])
 def speak_handler(message):
     global chatID_matrix
-    ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
-    chatID_matrix[ID_index][1] = chatID_matrix[ID_index][2] #msg_counter = reply_after
-    count_all(message)
+    if (check_for_start(message)):
+        ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
+        chatID_matrix[ID_index][1] = chatID_matrix[ID_index][2] #msg_counter = reply_after
+        count_all(message)
 
 
 @bot.message_handler(commands=['setInterval'])
 def interval_handler(message):
     global chatID_matrix
-    ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
-    reply_after = chatID_matrix[ID_index][2]
-    received_msg = message.text.replace("/setInterval","")
-    try:
-        reply_after_new = int(received_msg)
-        if(reply_after_new < reply_after):
-            bot.reply_to(message, "Okay, vou te incomodar mais agora")#print("Okay, I'll bother you less now")
-        else:
-            bot.reply_to(message, "Okay, vou te incomodar menos agora")#print("Okay, I'll bother you more now")
-        reply_after = reply_after_new
-        chatID_matrix[ID_index][2] = reply_after
-        print("Reply interval updated to", reply_after,"in chat",ID_index)
-        save_data(chatID_matrix)
-    except: bot.reply_to(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
+    if(check_for_start(message)):
+        ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
+        reply_after = chatID_matrix[ID_index][2]
+        received_msg = message.text.replace("/setInterval","")
+        try:
+            reply_after_new = int(received_msg)
+            if(reply_after_new < reply_after):
+                bot.reply_to(message, "Okay, vou te incomodar mais agora")#print("Okay, I'll bother you less now")
+            else:
+                bot.reply_to(message, "Okay, vou te incomodar menos agora")#print("Okay, I'll bother you more now")
+            reply_after = reply_after_new
+            chatID_matrix[ID_index][2] = reply_after
+            print("Reply interval updated to", reply_after,"in chat",ID_index)
+            save_data(chatID_matrix)
+        except: bot.reply_to(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
 
 
 @bot.message_handler(commands=['setRandomVar'])
 def randomVar_handler(message):
     global chatID_matrix
-    ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
-    max_random_variation = chatID_matrix[ID_index][4]
-    received_msg = message.text.replace("/setRandomVar", "")
-    try:
-        max_random_variation_new = int(received_msg)
-        if(max_random_variation_new == 0):
-            bot.reply_to(message, "Variação entre o tempo de resposta desativada. Sempre responderei após o mesmo número de mensagens agora")
-        elif(max_random_variation_new < max_random_variation):
-            bot.reply_to(message, "Okay, haverá menos variação entre o tempo de resposta agora")
-        else:
-            bot.reply_to(message, "Okay, haverá mais variação entre o tempo de resposta agora")
-        max_random_variation = max_random_variation_new
-        chatID_matrix[ID_index][4] = max_random_variation
-        print("Max variation updated to", max_random_variation,"in chat",ID_index)
-        save_data(chatID_matrix)
-    except: bot.reply_to(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
+    if(check_for_start(message)):
+        ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
+        max_random_variation = chatID_matrix[ID_index][4]
+        received_msg = message.text.replace("/setRandomVar", "")
+        try:
+            max_random_variation_new = int(received_msg)
+            if(max_random_variation_new == 0):
+                bot.reply_to(message, "Variação entre o tempo de resposta desativada. Sempre responderei após o mesmo número de mensagens agora")
+            elif(max_random_variation_new < max_random_variation):
+                bot.reply_to(message, "Okay, haverá menos variação entre o tempo de resposta agora")
+            else:
+                bot.reply_to(message, "Okay, haverá mais variação entre o tempo de resposta agora")
+            max_random_variation = max_random_variation_new
+            chatID_matrix[ID_index][4] = max_random_variation
+            print("Max variation updated to", max_random_variation,"in chat",ID_index)
+            save_data(chatID_matrix)
+        except: bot.reply_to(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
 
 
 
 @bot.message_handler(commands=['consult'])
 def consult_handler(message):
     global chatID_matrix
-    ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
-    reply_after = chatID_matrix[ID_index][2]
-    random_variation = chatID_matrix[ID_index][3]
-    max_random_variation = int(chatID_matrix[ID_index][4])
+    if(check_for_start(message)):
+        ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
+        reply_after = chatID_matrix[ID_index][2]
+        random_variation = chatID_matrix[ID_index][3]
+        max_random_variation = int(chatID_matrix[ID_index][4])
 
-    reply_text = ("Responder depois de " + str(int(reply_after)) + " mensagens\nVariação máxima: " +
-                  str(max_random_variation) + "\nVariação atual: " + str(int(random_variation)))
-    bot.reply_to(message, reply_text)
+        reply_text = ("Responder depois de " + str(int(reply_after)) + " mensagens\nVariação máxima: " +
+                    str(max_random_variation) + "\nVariação atual: " + str(int(random_variation)))
+        bot.reply_to(message, reply_text)
 
 
 @bot.message_handler(commands=['help'])
 def help_handler(message):
-    bot.reply_to(message, "/start - Inicia o bot\n/setInterval n - Muda quantas mensagens devem passar até que o bot fale para n. Default: 50\n/setRandomVar n - Muda a variação aleatória +/- n entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot")
+    bot.reply_to(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de um nome de um jogo ou filme + uma opinião + um motivo\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
+
+@bot.message_handler(commands=['suggestGame'])
+def suggest_game_handler(message):
+    global game_names_suggested
+    game_names_suggested = game_names_suggested + [message.text.replace("/suggestGame ", "")]
+    save_suggestions()
+    bot.reply_to(message, "Sugestão adicionada à database")
+
+@bot.message_handler(commands=['suggestMovie'])
+def suggest_movie_handler(message):
+    global movie_names_suggested
+    movie_names_suggested = movie_names_suggested + [message.text.replace("/suggestMovie ", "")]
+    save_suggestions()
+    bot.reply_to(message, "Sugestão adicionada à database")
+
+@bot.message_handler(commands=['suggestOpinion'])
+def suggest_opinion_handler(message):
+    global opinions_suggested
+    opinions_suggested = opinions_suggested + [message.text.replace("/suggestOpinion ", "")]
+    save_suggestions()
+    bot.reply_to(message, "Sugestão adicionada à database")
+
+
+@bot.message_handler(commands=['suggestMotive'])
+def suggest_motive_handler(message):
+    global motives_suggested
+    motives_suggested = motives_suggested + [message.text.replace("/suggestMotive ", "")]
+    save_suggestions()
+    bot.reply_to(message, "Sugestão adicionada à database")
+
 
 # @bot.message_handler(commands=['setP2'])
 # def sign_handler(message):
@@ -217,6 +279,8 @@ def count_all(message):
         chatID_matrix[ID_index][1] = msg_counter
         save_data(chatID_matrix)
         print("Messages until next reply for chat", ID_index, ":", reply_after - msg_counter)
+
+
 
 
 bot.infinity_polling()
