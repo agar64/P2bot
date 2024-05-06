@@ -1,5 +1,7 @@
 import os
 import random
+import time
+
 import numpy as np
 
 import telebot
@@ -24,13 +26,17 @@ msg_counter = 0
 reply_after = 50
 random_variation = 0
 max_random_variation = 0
+anti_spam = False
+
+last_reply = 0
 
 try:
     chatID_matrix = load_data()
     print("Loaded Saved Matrix")
+    #print(chatID_matrix)
 except OSError:
     print("Generated New Matrix")
-    chatID_matrix = np.zeros((1,5), dtype=int)
+    chatID_matrix = np.zeros((1,6), dtype=int)
 
 
 game_names = ["The Last of Us", "Among Us", "Xenoblade Chronicles", "Sonic '06", "Sonic R", "Zelda 2", "Mario Is Missing",
@@ -67,10 +73,10 @@ motives = ["that happens in the game", "bro liked his own comment", "I gotta hop
            "all you have to do is not let him near women", "I am smart", "(Tava afim de comer lamen)",
            "when the spire is slain\nBottom text"]
 try:
-    game_names_suggested = load_suggestions()["a"]
-    movie_names_suggested = load_suggestions()["b"]
-    opinions_suggested = load_suggestions()["c"]
-    motives_suggested = load_suggestions()["d"]
+    game_names_suggested = (load_suggestions()["a"]).tolist()
+    movie_names_suggested = (load_suggestions()["b"]).tolist()
+    opinions_suggested = (load_suggestions()["c"]).tolist()
+    motives_suggested = (load_suggestions()["d"]).tolist()
     print("Suggestions loaded successfully")
 except:
     game_names_suggested = []
@@ -112,7 +118,7 @@ def check_for_start(message):
 
 def start_conversation(chatID):
     global chatID_matrix
-    properties = [[chatID, msg_counter, reply_after, random_variation, max_random_variation]]
+    properties = [[chatID, msg_counter, reply_after, random_variation, max_random_variation, anti_spam]]
     #itemindex = np.where(chatID_matrix == chatID)
     #print("Check:", np.isin(chatID, chatID_matrix[:, 0]), "chatID:", chatID, "Matrix:", chatID_matrix[:, 0])
     if(not np.isin(chatID, chatID_matrix[:, 0])):
@@ -139,11 +145,26 @@ def restart_handler(message):
 
 @bot.message_handler(commands=['speak'])
 def speak_handler(message):
-    global chatID_matrix
+    global chatID_matrix, last_reply
     if (check_for_start(message)):
         ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
         chatID_matrix[ID_index][1] = chatID_matrix[ID_index][2] #msg_counter = reply_after
+        last_reply = 0
         count_all(message)
+
+@bot.message_handler(commands=['antiSpam'])
+def spam_handler(message):
+    global chatID_matrix
+    if check_for_start(message):
+        ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
+        anti_spam = chatID_matrix[ID_index][5]
+        anti_spam = not anti_spam
+        if(anti_spam): state = "ativada"
+        else: state = "desativada"
+        text = "Função anti-spam " + state
+        chatID_matrix[ID_index][5] = anti_spam
+        save_data(chatID_matrix)
+        bot.reply_to(message, text)
 
 
 @bot.message_handler(commands=['setInterval'])
@@ -197,15 +218,21 @@ def consult_handler(message):
         reply_after = chatID_matrix[ID_index][2]
         random_variation = chatID_matrix[ID_index][3]
         max_random_variation = int(chatID_matrix[ID_index][4])
+        anti_spam = chatID_matrix[ID_index][5]
+
+        if (anti_spam):
+            state = "ativado"
+        else:
+            state = "desativado"
 
         reply_text = ("Responder depois de " + str(int(reply_after)) + " mensagens\nVariação máxima: " +
-                    str(max_random_variation) + "\nVariação atual: " + str(int(random_variation)))
+                    str(max_random_variation) + "\nVariação atual: " + str(int(random_variation)) + "\nAnti-Spam: " + state)
         bot.reply_to(message, reply_text)
 
 
 @bot.message_handler(commands=['help'])
 def help_handler(message):
-    bot.reply_to(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de um nome de um jogo ou filme + uma opinião + um motivo\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
+    bot.reply_to(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/antiSpam - Quando ativado, o bot esperará no mínimo 10 minutos antes de falar a menos que forçado a falar com o _speak_. Default: off\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de um nome de um jogo ou filme + uma opinião + um motivo\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
 
 @bot.message_handler(commands=['suggestGame'])
 def suggest_game_handler(message):
@@ -258,7 +285,7 @@ def suggest_motive_handler(message):
 
 @bot.message_handler(func=lambda msg: True)
 def count_all(message):
-    global chatID_matrix
+    global chatID_matrix, last_reply
     if(check_for_start(message)):
         ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
         #print("chatID_matrix[",ID_index,"][",1,"]")
@@ -267,9 +294,17 @@ def count_all(message):
         random_variation = chatID_matrix[ID_index][3]
         max_random_variation = int(chatID_matrix[ID_index][4])
 
-        if(msg_counter > reply_after - 1):
+        anti_spam = chatID_matrix[ID_index][5]
+
+        if anti_spam:
+            condition = (time.time() - last_reply) > 600
+        else:
+            condition = True
+
+        if (msg_counter > reply_after - 1) and condition:
             text = select_text()
             bot.send_message(message.chat.id, text, parse_mode="Markdown")
+            last_reply = time.time()
             msg_counter = 0 + random_variation
             random_variation = random.randint(-max_random_variation, max_random_variation)
             print("random_variation for chat",ID_index,":", random_variation)
