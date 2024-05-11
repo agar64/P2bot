@@ -85,6 +85,8 @@ except:
     motives_suggested = []
     print("Suggestions file not found")
 
+#print(motives_suggested)
+
 def save_suggestions():
     #saved_suggestions = [game_names_suggested, movie_names_suggested, opinions_suggested, motives_suggested]
     np.savez("suggestions", a=game_names_suggested, b=movie_names_suggested, c=opinions_suggested, d=motives_suggested)
@@ -232,36 +234,52 @@ def consult_handler(message):
 
 @bot.message_handler(commands=['help'])
 def help_handler(message):
-    bot.reply_to(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/antiSpam - Quando ativado, o bot esperará no mínimo 10 minutos antes de falar a menos que forçado a falar com o _speak_. Default: off\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de um nome de um jogo ou filme + uma opinião + um motivo\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
+    bot.reply_to(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/antiSpam - Quando ativado, o bot esperará no mínimo 10 minutos antes de falar a menos que forçado a falar com o _speak_. Default: off\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de: *\"Acabei de jogar/assistir* _jogo/filme_ *e* _opinião_ *pois* _motivo_*\"*\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
 
 @bot.message_handler(commands=['suggestGame'])
 def suggest_game_handler(message):
     global game_names_suggested
-    game_names_suggested = game_names_suggested + [message.text.replace("/suggestGame ", "")]
-    save_suggestions()
-    bot.reply_to(message, "Sugestão adicionada à database")
+    parsed = [message.text.replace("/suggestGame ", "")]
+    if not ((parsed == ["/suggestGame"]) or (parsed == [""])):
+        game_names_suggested = game_names_suggested + parsed
+        save_suggestions()
+        bot.reply_to(message, "Sugestão adicionada à database")
+    else:
+        bot.reply_to(message, "Por favor digite alguma coisa")
 
 @bot.message_handler(commands=['suggestMovie'])
 def suggest_movie_handler(message):
     global movie_names_suggested
-    movie_names_suggested = movie_names_suggested + [message.text.replace("/suggestMovie ", "")]
-    save_suggestions()
-    bot.reply_to(message, "Sugestão adicionada à database")
+    parsed = [message.text.replace("/suggestMovie ", "")]
+    if not ((parsed == ["/suggestMovie"]) or (parsed == [""])):
+        movie_names_suggested = movie_names_suggested + parsed
+        save_suggestions()
+        bot.reply_to(message, "Sugestão adicionada à database")
+    else:
+        bot.reply_to(message, "Por favor digite alguma coisa")
 
 @bot.message_handler(commands=['suggestOpinion'])
 def suggest_opinion_handler(message):
     global opinions_suggested
-    opinions_suggested = opinions_suggested + [message.text.replace("/suggestOpinion ", "")]
-    save_suggestions()
-    bot.reply_to(message, "Sugestão adicionada à database")
+    parsed = [message.text.replace("/suggestOpinion ", "")]
+    if not ((parsed == ["/suggestOpinion"]) or (parsed == [""])):
+        opinions_suggested = opinions_suggested + parsed
+        save_suggestions()
+        bot.reply_to(message, "Sugestão adicionada à database")
+    else:
+        bot.reply_to(message, "Por favor digite alguma coisa")
 
 
 @bot.message_handler(commands=['suggestMotive'])
 def suggest_motive_handler(message):
     global motives_suggested
-    motives_suggested = motives_suggested + [message.text.replace("/suggestMotive ", "")]
-    save_suggestions()
-    bot.reply_to(message, "Sugestão adicionada à database")
+    parsed = [message.text.replace("/suggestMotive ", "")]
+    if not ((parsed == ["/suggestMotive"]) or (parsed == [""])):
+        motives_suggested = motives_suggested + parsed
+        save_suggestions()
+        bot.reply_to(message, "Sugestão adicionada à database")
+    else:
+        bot.reply_to(message, "Por favor digite alguma coisa")
 
 
 # @bot.message_handler(commands=['setP2'])
