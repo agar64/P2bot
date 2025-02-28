@@ -1,6 +1,7 @@
 import os
 import random
 import time
+import datetime
 
 import numpy as np
 
@@ -301,7 +302,7 @@ def suggest_motive_handler(message):
 # def echo_all(message):
 #     bot.reply_to(message, message.text)
 
-@bot.message_handler(func=lambda msg: True)
+@bot.message_handler(content_types=['text', 'photo', 'sticker', 'video', 'animation', 'document'])
 def count_all(message):
     global chatID_matrix, last_reply
     if(check_for_start(message)):
@@ -320,10 +321,10 @@ def count_all(message):
             condition = True
 
         if (msg_counter > reply_after - 1) and condition:
+            msg_counter = 0 + random_variation
             text = select_text()
             bot.send_message(message.chat.id, text, parse_mode="Markdown")
             last_reply = time.time()
-            msg_counter = 0 + random_variation
             random_variation = random.randint(-max_random_variation, max_random_variation)
             print("random_variation for chat",ID_index,":", random_variation)
             chatID_matrix[ID_index][3] = random_variation
@@ -331,9 +332,15 @@ def count_all(message):
             msg_counter = msg_counter + 1
         chatID_matrix[ID_index][1] = msg_counter
         save_data(chatID_matrix)
-        print("Messages until next reply for chat", ID_index, ":", reply_after - msg_counter)
+        ct = datetime.datetime.now()
+        print(ct.time(),"- Messages until next reply for chat", ID_index, ":", reply_after - msg_counter,f"- {message.content_type}",)
 
 
 
 
-bot.infinity_polling()
+while True:
+    try:
+        bot.infinity_polling(timeout=60, long_polling_timeout=60)
+    except Exception as e:
+        print(f"Error: {e}")
+        time.sleep(5)  # Wait a bit before retrying
