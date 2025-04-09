@@ -2,8 +2,12 @@ import os
 import random
 import time
 import datetime
+import requests
+from telebot.apihelper import ApiTelegramException
 
 import numpy as np
+
+from markov import MarkovManager
 
 import telebot
 
@@ -113,9 +117,29 @@ def select_text():
     return "Acabei de " + action + " " + first_name + " e " + middle_name + " pois " + last_name
 
 
+def safe_send_message(chat_id, text, retries=3, delay=2, parse_mode=None):
+    for attempt in range(retries):
+        try:
+            return bot.send_message(chat_id, text, parse_mode=parse_mode)
+        except (requests.exceptions.RequestException, ApiTelegramException) as e:
+            print(f"[safe_send_message] Attempt {attempt+1} failed: {e}")
+            time.sleep(delay)
+    print("[safe_send_message] All retries failed.")
+    return None
+
+def safe_reply(chat_id, text, retries=3, delay=2, parse_mode=None):
+    for attempt in range(retries):
+        try:
+            return bot.reply_to(chat_id, text, parse_mode=parse_mode)
+        except (requests.exceptions.RequestException, ApiTelegramException) as e:
+            print(f"[safe_send_message] Attempt {attempt+1} failed: {e}")
+            time.sleep(delay)
+    print("[safe_send_message] All retries failed.")
+    return None
+
 def check_for_start(message):
     if (not np.isin(message.chat.id, chatID_matrix[:, 0])):
-        bot.reply_to(message, "Acho que não falei contigo antes, que tal dar um /start primeiro?")
+        safe_reply(message, "Acho que não falei contigo antes, que tal dar um /start primeiro?")
         return False
     else: return True
 
@@ -132,7 +156,7 @@ def start_conversation(chatID):
 
 @bot.message_handler(commands=['start', 'hello'])
 def send_welcome(message):
-    bot.reply_to(message, "Howdy, how are you doing?")
+    safe_reply(message, "Howdy, how are you doing?")
     start_conversation(message.chat.id)
 
 
@@ -142,11 +166,11 @@ def restart_handler(message):
     if (check_for_start(message)):
         ID_index = np.nonzero(chatID_matrix[:, 0] == message.chat.id)[0][0]
         chatID_matrix = np.delete(chatID_matrix, (ID_index), axis=0)
-        bot.reply_to(message, "Howdy, how are you doing? All your settings were reset")
+        safe_reply(message, "Howdy, how are you doing? All your settings were reset")
         start_conversation(message.chat.id)
 
 
-@bot.message_handler(commands=['speak'])
+@bot.message_handler(commands=['talk'])
 def speak_handler(message):
     global chatID_matrix, last_reply
     if (check_for_start(message)):
@@ -167,7 +191,7 @@ def spam_handler(message):
         text = "Função anti-spam " + state
         chatID_matrix[ID_index][5] = anti_spam
         save_data(chatID_matrix)
-        bot.reply_to(message, text)
+        safe_reply(message, text)
 
 
 @bot.message_handler(commands=['setInterval'])
@@ -180,14 +204,14 @@ def interval_handler(message):
         try:
             reply_after_new = int(received_msg)
             if(reply_after_new < reply_after):
-                bot.reply_to(message, "Okay, vou te incomodar mais agora")#print("Okay, I'll bother you less now")
+                safe_reply(message, "Okay, vou te incomodar mais agora")#print("Okay, I'll bother you less now")
             else:
-                bot.reply_to(message, "Okay, vou te incomodar menos agora")#print("Okay, I'll bother you more now")
+                safe_reply(message, "Okay, vou te incomodar menos agora")#print("Okay, I'll bother you more now")
             reply_after = reply_after_new
             chatID_matrix[ID_index][2] = reply_after
             print("Reply interval updated to", reply_after,"in chat",ID_index)
             save_data(chatID_matrix)
-        except: bot.reply_to(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
+        except: safe_reply(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
 
 
 @bot.message_handler(commands=['setRandomVar'])
@@ -200,16 +224,16 @@ def randomVar_handler(message):
         try:
             max_random_variation_new = int(received_msg)
             if(max_random_variation_new == 0):
-                bot.reply_to(message, "Variação entre o tempo de resposta desativada. Sempre responderei após o mesmo número de mensagens agora")
+                safe_reply(message, "Variação entre o tempo de resposta desativada. Sempre responderei após o mesmo número de mensagens agora")
             elif(max_random_variation_new < max_random_variation):
-                bot.reply_to(message, "Okay, haverá menos variação entre o tempo de resposta agora")
+                safe_reply(message, "Okay, haverá menos variação entre o tempo de resposta agora")
             else:
-                bot.reply_to(message, "Okay, haverá mais variação entre o tempo de resposta agora")
+                safe_reply(message, "Okay, haverá mais variação entre o tempo de resposta agora")
             max_random_variation = max_random_variation_new
             chatID_matrix[ID_index][4] = max_random_variation
             print("Max variation updated to", max_random_variation,"in chat",ID_index)
             save_data(chatID_matrix)
-        except: bot.reply_to(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
+        except: safe_reply(message, "Ei, isso não é um número inteiro!")#print("Hey, that's not an int!")
 
 
 
@@ -230,12 +254,12 @@ def consult_handler(message):
 
         reply_text = ("Responder depois de " + str(int(reply_after)) + " mensagens\nVariação máxima: " +
                     str(max_random_variation) + "\nVariação atual: " + str(int(random_variation)) + "\nAnti-Spam: " + state)
-        bot.reply_to(message, reply_text)
+        safe_reply(message, reply_text)
 
 
 @bot.message_handler(commands=['help'])
 def help_handler(message):
-    bot.reply_to(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/speak - Força o bot a falar\n/antiSpam - Quando ativado, o bot esperará no mínimo 10 minutos antes de falar a menos que forçado a falar com o _speak_. Default: off\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de: *\"Acabei de jogar/assistir* _jogo/filme_ *e* _opinião_ *pois* _motivo_*\"*\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
+    safe_reply(message, "/start - Inicia o bot\n/setInterval _n_ - Muda quantas mensagens devem passar até que o bot fale para _n_. Default: 50\n/setRandomVar _n_ - Muda a variação aleatória +/- _n_ entre o número de mensagens que o bot espera antes de falar. Default: 0\n/talk - Força o bot a falar\n/antiSpam - Quando ativado, o bot esperará no mínimo 10 minutos antes de falar a menos que forçado a falar com o _speak_. Default: off\n/consult - Consulta as configurações do bot para este chat\n/restart - Reseta as suas configurações e reinicia o bot\n*Contexto para as opções abaixo:* Uma fala do bot consiste de: *\"Acabei de jogar/assistir* _jogo/filme_ *e* _opinião_ *pois* _motivo_*\"*\n/suggestGame _gameName_ - Sugere um nome de jogo para a database\n/suggestMovie _movieName_ - Sugere um nome de filme para a database\n/suggestOpinion _opinion_ - Sugere uma opinião para a database\n/suggestMotive _motive_ - Sugere um motivo para a database", parse_mode = "Markdown")
 
 @bot.message_handler(commands=['suggestGame'])
 def suggest_game_handler(message):
@@ -244,9 +268,9 @@ def suggest_game_handler(message):
     if not ((parsed == ["/suggestGame"]) or (parsed == [""])):
         game_names_suggested = game_names_suggested + parsed
         save_suggestions()
-        bot.reply_to(message, "Sugestão adicionada à database")
+        safe_reply(message, "Sugestão adicionada à database")
     else:
-        bot.reply_to(message, "Por favor digite alguma coisa")
+        safe_reply(message, "Por favor digite alguma coisa")
 
 @bot.message_handler(commands=['suggestMovie'])
 def suggest_movie_handler(message):
@@ -255,9 +279,9 @@ def suggest_movie_handler(message):
     if not ((parsed == ["/suggestMovie"]) or (parsed == [""])):
         movie_names_suggested = movie_names_suggested + parsed
         save_suggestions()
-        bot.reply_to(message, "Sugestão adicionada à database")
+        safe_reply(message, "Sugestão adicionada à database")
     else:
-        bot.reply_to(message, "Por favor digite alguma coisa")
+        safe_reply(message, "Por favor digite alguma coisa")
 
 @bot.message_handler(commands=['suggestOpinion'])
 def suggest_opinion_handler(message):
@@ -266,9 +290,9 @@ def suggest_opinion_handler(message):
     if not ((parsed == ["/suggestOpinion"]) or (parsed == [""])):
         opinions_suggested = opinions_suggested + parsed
         save_suggestions()
-        bot.reply_to(message, "Sugestão adicionada à database")
+        safe_reply(message, "Sugestão adicionada à database")
     else:
-        bot.reply_to(message, "Por favor digite alguma coisa")
+        safe_reply(message, "Por favor digite alguma coisa")
 
 
 @bot.message_handler(commands=['suggestMotive'])
@@ -278,29 +302,31 @@ def suggest_motive_handler(message):
     if not ((parsed == ["/suggestMotive"]) or (parsed == [""])):
         motives_suggested = motives_suggested + parsed
         save_suggestions()
-        bot.reply_to(message, "Sugestão adicionada à database")
+        safe_reply(message, "Sugestão adicionada à database")
     else:
-        bot.reply_to(message, "Por favor digite alguma coisa")
+        safe_reply(message, "Por favor digite alguma coisa")
 
 
 # @bot.message_handler(commands=['setP2'])
 # def sign_handler(message):
 #     text = "P2, responda a esta mensagem"
-#     sent_msg = bot.send_message(message.chat.id, text, parse_mode="Markdown")
+#     sent_msg = safe_send_message(message.chat.id, text, parse_mode="Markdown")
 #     bot.register_next_step_handler(sent_msg, p2_set_reply_handler)
 #
 #
 # def p2_set_reply_handler(message):
 #     sign = message.text
 #     text = "As definições de P2 foram atualizadas"
-#     bot.reply_to(message, text)
+#     safe_reply(message, text)
 #     global p2_id
 #     p2_id = message.chat.id
 
 
 # @bot.message_handler(func=lambda msg: True)
 # def echo_all(message):
-#     bot.reply_to(message, message.text)
+#     safe_reply(message, message.text)
+
+manager = MarkovManager()
 
 @bot.message_handler(content_types=['text', 'photo', 'sticker', 'video', 'animation', 'document'])
 def count_all(message):
@@ -318,12 +344,26 @@ def count_all(message):
         if anti_spam:
             condition = (time.time() - last_reply) > 600
         else:
-            condition = True
+            condition = (time.time() - last_reply) > 0.0001 #True
+
+        if (message.from_user.username == "WAFFLEDUDE"):
+            if (message.text is not None):
+                manager.learn_text(message.chat.id, message.text)
+            elif (message.caption is not None):
+                manager.learn_text(message.chat.id, message.caption)
+
+        '''if ((message.text is not None) and (message.from_user.username == "WAFFLEDUDE")):
+            manager.learn_text(message.chat.id, message.text)'''
 
         if (msg_counter > reply_after - 1) and condition:
             msg_counter = 0 + random_variation
             text = select_text()
-            bot.send_message(message.chat.id, text, parse_mode="Markdown")
+
+            if(random.randint(0,99) < 10):
+                safe_send_message(message.chat.id, manager.generate_text(message.chat.id))
+            else:
+                safe_send_message(message.chat.id, text, parse_mode="Markdown")
+
             last_reply = time.time()
             random_variation = random.randint(-max_random_variation, max_random_variation)
             print("random_variation for chat",ID_index,":", random_variation)
