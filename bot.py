@@ -347,9 +347,9 @@ def count_all(message):
             condition = (time.time() - last_reply) > 0.0001 #True
 
         if (message.from_user.username == "WAFFLEDUDE"):
-            if (message.text is not None):
+            if (message.text is not None and "https://" not in message.text):
                 manager.learn_text(message.chat.id, message.text)
-            elif (message.caption is not None):
+            elif (message.caption is not None and "https://" not in message.caption):
                 manager.learn_text(message.chat.id, message.caption)
 
         '''if ((message.text is not None) and (message.from_user.username == "WAFFLEDUDE")):
